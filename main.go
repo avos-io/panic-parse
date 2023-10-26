@@ -10,13 +10,11 @@ import (
 	"github.com/mitchellh/panicwrap"
 )
 
-var sentry = panicparse.FromDNS("your dsn here")
+var sentry = panicparse.Init("your dsn here")
 
 func main() {
 	exitStatus, err := panicwrap.BasicWrap(panicHandler)
 	if err != nil {
-		// Something went wrong setting up the panic wrapper. Unlikely,
-		// but possible.
 		panic(err)
 	}
 
@@ -26,9 +24,11 @@ func main() {
 		os.Exit(exitStatus)
 	}
 
-	// Otherwise, exitStatus < 0 means we're the child. Continue executing as
-	// normal...
+	// Else we're the child so execute our real main function
+	oldmain()
+}
 
+func oldmain() {
 	// Let's say we panic
 	//panic("oh shucks")
 
@@ -44,7 +44,7 @@ func panicHandler(output string) {
 	json, _ := json.MarshalIndent(event, "", "  ")
 	fmt.Printf("panic report: %v\n", string(json))
 
-	id, err := sentry.SendCrashReport(event)
+	id, err := sentry.Capture(event)
 	if err != nil {
 		fmt.Printf("send crash report failed: %v\n", err)
 	} else {

@@ -36,11 +36,15 @@ const (
 )
 
 type Event struct {
-	Id      uuid.UUID
-	Panic   Panic
-	Threads []*Goroutine
-	Level   string
-	Extra   map[string]interface{}
+	Id         uuid.UUID
+	Panic      *Panic
+	Threads    []*Goroutine
+	Level      string
+	ServerName string
+	Release    string
+	Tags       map[string]string
+	Enviroment string
+	Extra      map[string]interface{}
 }
 
 func (e *Event) MarshalJSON() ([]byte, error) {
@@ -48,19 +52,27 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	id := strings.Replace(uuid, "-", "", -1)
 
 	return json.Marshal(&struct {
-		Id        string                 `json:"event_id"`
-		Exception []Panic                `json:"exception"`
-		Threads   []*Goroutine           `json:"threads"`
-		Platform  string                 `json:"platform"`
-		Level     string                 `json:"level"`
-		Extra     map[string]interface{} `json:"extra,omitempty"`
+		Id         string                 `json:"event_id"`
+		Exception  []*Panic               `json:"exception"`
+		Threads    []*Goroutine           `json:"threads"`
+		Platform   string                 `json:"platform"`
+		Level      string                 `json:"level"`
+		ServerName string                 `json:"server_name,omitempty"`
+		Release    string                 `json:"release,omitempty"`
+		Tags       map[string]string      `json:"tags,omitempty"`
+		Enviroment string                 `json:"environment,omitempty"`
+		Extra      map[string]interface{} `json:"extra,omitempty"`
 	}{
-		Id:        id,
-		Exception: []Panic{e.Panic},
-		Threads:   e.Threads,
-		Platform:  "go",
-		Level:     e.Level,
-		Extra:     e.Extra,
+		Id:         id,
+		Exception:  []*Panic{e.Panic},
+		Threads:    e.Threads,
+		Platform:   "go",
+		Level:      e.Level,
+		ServerName: e.ServerName,
+		Release:    e.Release,
+		Tags:       e.Tags,
+		Enviroment: e.Enviroment,
+		Extra:      e.Extra,
 	})
 }
 
@@ -68,12 +80,12 @@ type Panic struct {
 	Type        string
 	Description string
 	Synthetic   bool
-	Signal      *string
+	Signal      string
 	SignalInfo  string
-	Code        *string
-	Address     *string
-	PC          *string
-	ThreadId    *int
+	Code        string
+	Address     string
+	PC          string
+	ThreadId    int
 }
 
 func (p *Panic) MarshalJSON() ([]byte, error) {
@@ -102,8 +114,8 @@ func (p *Panic) MarshalJSON() ([]byte, error) {
 		Type: "panic",
 		Data: make(map[string]interface{}),
 	}
-	if p.Signal != nil {
-		code, err := strconv.ParseInt(*p.Code, 0, 32)
+	if p.Signal != "" {
+		code, err := strconv.ParseInt(p.Code, 0, 32)
 		if err != nil {
 			code = 0
 		}
@@ -111,16 +123,16 @@ func (p *Panic) MarshalJSON() ([]byte, error) {
 		mechanism.Type = "signal"
 		mechanism.Meta = &Meta{
 			Signal: &Signal{
-				Name: *p.Signal,
+				Name: p.Signal,
 				Code: code,
 			},
 		}
 		mechanism.Description = p.SignalInfo
-		if p.Address != nil {
-			mechanism.Data["relevant_address"] = *p.Address
+		if p.Address != "" {
+			mechanism.Data["relevant_address"] = p.Address
 		}
-		if p.PC != nil {
-			mechanism.Data["program_counter"] = *p.PC
+		if p.PC != "" {
+			mechanism.Data["program_counter"] = p.PC
 		}
 	}
 
@@ -129,7 +141,7 @@ func (p *Panic) MarshalJSON() ([]byte, error) {
 		Value     string    `json:"value"`
 		Synthetic *bool     `json:"synthetic,omitempty"`
 		Mechanism Mechanism `json:"mechanism"`
-		ThreadId  *int      `json:"thread_id,omitempty"`
+		ThreadId  int       `json:"thread_id,omitempty"`
 	}{
 		Type:      p.Type,
 		Value:     p.Description,
@@ -184,7 +196,9 @@ func (f *Frame) MarshalJSON() ([]byte, error) {
 		fun = f.Func
 	}
 
-	inApp := strings.HasPrefix(f.File, build.Default.GOROOT) || strings.Contains(f.Package, "vendor") || strings.Contains(f.Package, "third_party")
+	inApp := !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
+		strings.Contains(f.Package, "vendor") ||
+		strings.Contains(f.Package, "third_party"))
 
 	return json.Marshal(&struct {
 		Package string `json:"module"`
@@ -256,18 +270,18 @@ func Parse(trace io.Reader) *Event {
 					parts := strings.Split(info, "=")
 					switch parts[0] {
 					case "code":
-						panic.Code = &parts[1]
+						panic.Code = parts[1]
 					case "addr":
-						panic.Address = &parts[1]
+						panic.Address = parts[1]
 					case "pc":
-						panic.PC = &parts[1]
+						panic.PC = parts[1]
 					}
 				} else {
 					panicInfo = append(panicInfo, info)
 				}
 			}
 
-			panic.Signal = &signal
+			panic.Signal = signal
 			panic.SignalInfo = strings.Join(panicInfo, " ")
 
 		case stateSignal:
@@ -284,8 +298,8 @@ func Parse(trace io.Reader) *Event {
 			}
 
 			// I think the first thread we see is the one that panicked
-			if panic.ThreadId == nil {
-				panic.ThreadId = &id
+			if panic.ThreadId == 0 {
+				panic.ThreadId = id
 			}
 
 			goroutine = &Goroutine{
@@ -358,9 +372,10 @@ func Parse(trace io.Reader) *Event {
 
 	return &Event{
 		Id:      uuid.New(),
-		Panic:   panic,
+		Panic:   &panic,
 		Threads: threads,
 		Level:   "fatal",
+		Tags:    make(map[string]string),
 		Extra:   make(map[string]interface{}),
 	}
 }

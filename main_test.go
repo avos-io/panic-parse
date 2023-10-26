@@ -10,17 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var sentry = panicparse.FromDNS("your dsn here")
+var sentry = panicparse.Init("your dsn here")
 
 func TestPanicParse(t *testing.T) {
-	for _, data := range testData {
+	for i, data := range testData {
 		event := panicparse.Parse(strings.NewReader(data))
 		event.Extra["panic"] = data
+		event.Enviroment = "test"
+		event.Tags["iteration"] = fmt.Sprintf("%d", i)
 
 		json, _ := json.MarshalIndent(event, "", "  ")
 		fmt.Printf("panic report: %v\n", string(json))
 
-		_, err := sentry.SendCrashReport(event)
+		_, err := sentry.Capture(event)
 		require.NoError(t, err)
 	}
 }
