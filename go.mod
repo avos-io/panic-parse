@@ -1,4 +1,4 @@
-module github.com/avos-io/gocrash
+module github.com/avos-io/panic-parse
 
 go 1.19
 

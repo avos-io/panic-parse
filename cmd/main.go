@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avos-io/gocrash/panicparse"
+	panicparse "github.com/avos-io/panic-parse"
 	sentry "github.com/getsentry/sentry-go"
 	"github.com/mitchellh/panicwrap"
 )
@@ -36,10 +36,10 @@ func main() {
 	}
 
 	// Else we're the child so execute our real main function
-	oldmain()
+	oldMain()
 }
 
-func oldmain() {
+func oldMain() {
 	// Let's say we panic
 	//panic("oh shucks")
 

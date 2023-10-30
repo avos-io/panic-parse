@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avos-io/gocrash/panicparse"
+	panicparse "github.com/avos-io/panic-parse"
 	sentry "github.com/getsentry/sentry-go"
 	"github.com/rs/zerolog/log"
 )
