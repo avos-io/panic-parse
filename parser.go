@@ -214,19 +214,14 @@ func Parse(trace io.Reader) *sentry.Event {
 		}
 	}
 
-	event, err := eventToSentryEvent(&Event{
+	return eventToSentryEvent(&Event{
 		Panic:   &panic,
 		Threads: threads,
 		Level:   "fatal",
 	})
-	if err != nil {
-		return nil
-	}
-
-	return event
 }
 
-func eventToSentryEvent(e *Event) (*sentry.Event, error) {
+func eventToSentryEvent(e *Event) *sentry.Event {
 	event := sentry.NewEvent()
 	event.Message = e.Panic.Description
 	event.Level = sentry.LevelFatal
@@ -237,7 +232,7 @@ func eventToSentryEvent(e *Event) (*sentry.Event, error) {
 
 	event.Threads = goroutinesToSentryThreads(e.Threads)
 
-	return event, nil
+	return event
 }
 
 func panicToSentryException(p *Panic) *sentry.Exception {
