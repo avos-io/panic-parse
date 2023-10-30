@@ -5,18 +5,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/avos-io/gocrash/panicparse"
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/mitchellh/panicwrap"
 )
-
-var sentry = panicparse.Init("your dsn here")
 
 const (
 	wrap = true // Could be set with a command line flag or environment variable
 )
 
 func main() {
+	sentry.Init(sentry.ClientOptions{
+		Dsn: "your dsn here",
+	})
+	defer sentry.Flush(time.Second * 5)
+
 	if wrap {
 		exitStatus, err := panicwrap.BasicWrap(panicHandler)
 		if err != nil {
@@ -50,12 +55,8 @@ func panicHandler(output string) {
 	json, _ := json.MarshalIndent(event, "", "  ")
 	fmt.Printf("panic report: %v\n", string(json))
 
-	id, err := sentry.Capture(event)
-	if err != nil {
-		fmt.Printf("send crash report failed: %v\n", err)
-	} else {
-		fmt.Printf("sentry event id: %v\n", id)
-	}
+	id := sentry.CaptureEvent(event)
+	fmt.Printf("sentry event id: %v\n", id)
 
 	os.Exit(1)
 }

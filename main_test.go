@@ -5,25 +5,30 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/avos-io/gocrash/panicparse"
-	"github.com/stretchr/testify/require"
+	sentry "github.com/getsentry/sentry-go"
+	"github.com/rs/zerolog/log"
 )
 
-var sentry = panicparse.Init("your dsn here")
-
 func TestPanicParse(t *testing.T) {
+	sentry.Init(sentry.ClientOptions{
+		Dsn: "your dsn here",
+	})
+	defer sentry.Flush(time.Second * 5)
+
 	for i, data := range testData {
 		event := panicparse.Parse(strings.NewReader(data))
 		event.Extra["panic"] = data
-		event.Enviroment = "test"
+		event.Environment = "test"
 		event.Tags["iteration"] = fmt.Sprintf("%d", i)
 
 		json, _ := json.MarshalIndent(event, "", "  ")
-		fmt.Printf("panic report: %v\n", string(json))
 
-		_, err := sentry.Capture(event)
-		require.NoError(t, err)
+		id := *sentry.CaptureEvent(event)
+
+		log.Debug().Str("panic", string(json)).Str("id", string(id)).Msg("panic report")
 	}
 }
 
@@ -80,4 +85,13 @@ main.anotherFunction()
 		/path/to/main.go:20
 created by main.main
 		/path/to/main.go:25`,
+	`panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0xffffffff addr=0x0 pc=0x20314]
+
+goroutine 1 [running]:
+panic(0x112c00, 0x1040a038)
+	/usr/local/go/src/runtime/panic.go:500 +0x720
+main.aFunction()
+	/tmp/sandbox675251439/main.go:23 +0x314
+...additional frames elided...`,
 }

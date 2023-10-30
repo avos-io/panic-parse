@@ -3,16 +3,14 @@ package panicparse
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"go/build"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/getsentry/sentry-go"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -36,44 +34,9 @@ const (
 )
 
 type Event struct {
-	Id         uuid.UUID
-	Panic      *Panic
-	Threads    []*Goroutine
-	Level      string
-	ServerName string
-	Release    string
-	Tags       map[string]string
-	Enviroment string
-	Extra      map[string]interface{}
-}
-
-func (e *Event) MarshalJSON() ([]byte, error) {
-	uuid := e.Id.String()
-	id := strings.Replace(uuid, "-", "", -1)
-
-	return json.Marshal(&struct {
-		Id         string                 `json:"event_id"`
-		Exception  []*Panic               `json:"exception"`
-		Threads    []*Goroutine           `json:"threads"`
-		Platform   string                 `json:"platform"`
-		Level      string                 `json:"level"`
-		ServerName string                 `json:"server_name,omitempty"`
-		Release    string                 `json:"release,omitempty"`
-		Tags       map[string]string      `json:"tags,omitempty"`
-		Enviroment string                 `json:"environment,omitempty"`
-		Extra      map[string]interface{} `json:"extra,omitempty"`
-	}{
-		Id:         id,
-		Exception:  []*Panic{e.Panic},
-		Threads:    e.Threads,
-		Platform:   "go",
-		Level:      e.Level,
-		ServerName: e.ServerName,
-		Release:    e.Release,
-		Tags:       e.Tags,
-		Enviroment: e.Enviroment,
-		Extra:      e.Extra,
-	})
+	Panic   *Panic
+	Threads []*Goroutine
+	Level   string
 }
 
 type Panic struct {
@@ -85,95 +48,14 @@ type Panic struct {
 	Code        string
 	Address     string
 	PC          string
-	ThreadId    int
-}
-
-func (p *Panic) MarshalJSON() ([]byte, error) {
-	type Signal struct {
-		Name string `json:"name"`
-		Code int64  `json:"code,omitempty"`
-	}
-
-	type Meta struct {
-		Signal *Signal `json:"signal,omitempty"`
-	}
-
-	type Mechanism struct {
-		Type        string                 `json:"type"`
-		Description string                 `json:"description,omitempty"`
-		Meta        *Meta                  `json:"meta,omitempty"`
-		Data        map[string]interface{} `json:"data,omitempty"`
-	}
-
-	var synthetic *bool
-	if p.Synthetic {
-		synthetic = &p.Synthetic
-	}
-
-	mechanism := Mechanism{
-		Type: "panic",
-		Data: make(map[string]interface{}),
-	}
-	if p.Signal != "" {
-		code, err := strconv.ParseInt(p.Code, 0, 32)
-		if err != nil {
-			code = 0
-		}
-
-		mechanism.Type = "signal"
-		mechanism.Meta = &Meta{
-			Signal: &Signal{
-				Name: p.Signal,
-				Code: code,
-			},
-		}
-		mechanism.Description = p.SignalInfo
-		if p.Address != "" {
-			mechanism.Data["relevant_address"] = p.Address
-		}
-		if p.PC != "" {
-			mechanism.Data["program_counter"] = p.PC
-		}
-	}
-
-	return json.Marshal(&struct {
-		Type      string    `json:"type"`
-		Value     string    `json:"value"`
-		Synthetic *bool     `json:"synthetic,omitempty"`
-		Mechanism Mechanism `json:"mechanism"`
-		ThreadId  int       `json:"thread_id,omitempty"`
-	}{
-		Type:      p.Type,
-		Value:     p.Description,
-		Synthetic: synthetic,
-		Mechanism: mechanism,
-		ThreadId:  p.ThreadId,
-	})
+	ThreadId    string
 }
 
 type Goroutine struct {
-	ID           int
+	ID           string
 	State        string
 	Frames       []*Frame
 	FramesElided bool
-}
-
-func (g *Goroutine) MarshalJSON() ([]byte, error) {
-	type StackTrace struct {
-		Frames []*Frame `json:"frames"`
-	}
-
-	return json.Marshal(&struct {
-		ID         int        `json:"id"`
-		State      string     `json:"state"`
-		StackTrace StackTrace `json:"stacktrace"`
-	}{
-		ID:    g.ID,
-		State: g.State,
-		StackTrace: StackTrace{
-			Frames: g.Frames,
-		},
-	})
 }
 
 type Frame struct {
@@ -188,36 +70,7 @@ type Frame struct {
 	StackOffset int64
 }
 
-func (f *Frame) MarshalJSON() ([]byte, error) {
-	var fun string
-	if f.Receiver != "" {
-		fun = f.Receiver + "." + f.Func
-	} else {
-		fun = f.Func
-	}
-
-	inApp := !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
-		strings.Contains(f.Package, "vendor") ||
-		strings.Contains(f.Package, "third_party"))
-
-	return json.Marshal(&struct {
-		Package string `json:"module"`
-		Func    string `json:"function"`
-		File    string `json:"filename"`
-		Line    int    `json:"lineno"`
-		RawFunc string `json:"raw_function"`
-		InApp   bool   `json:"in_app"`
-	}{
-		Package: f.Package,
-		Func:    fun,
-		File:    f.File,
-		Line:    f.Line,
-		RawFunc: f.RawFunc,
-		InApp:   inApp,
-	})
-}
-
-func Parse(trace io.Reader) *Event {
+func Parse(trace io.Reader) *sentry.Event {
 	scanner := bufio.NewScanner(trace)
 
 	state := stateInit
@@ -291,14 +144,10 @@ func Parse(trace io.Reader) *Event {
 				continue
 			}
 
-			id, err := strconv.Atoi(string(matches[1]))
-			if err != nil {
-				log.Err(err).Str("id", string(matches[1])).Msg("failed to parse goroutine id")
-				id = 0
-			}
+			id := string(matches[1])
 
 			// I think the first thread we see is the one that panicked
-			if panic.ThreadId == 0 {
+			if panic.ThreadId == "" {
 				panic.ThreadId = id
 			}
 
@@ -365,17 +214,103 @@ func Parse(trace io.Reader) *Event {
 		}
 	}
 
-	// Sentry expects the frames to be ordered from oldest to newest
-	for _, goroutine := range threads {
-		slices.Reverse(goroutine.Frames)
-	}
-
-	return &Event{
-		Id:      uuid.New(),
+	event, err := eventToSentryEvent(&Event{
 		Panic:   &panic,
 		Threads: threads,
 		Level:   "fatal",
-		Tags:    make(map[string]string),
-		Extra:   make(map[string]interface{}),
+	})
+	if err != nil {
+		return nil
 	}
+
+	return event
+}
+
+func eventToSentryEvent(e *Event) (*sentry.Event, error) {
+	event := sentry.NewEvent()
+	event.Message = e.Panic.Description
+	event.Level = sentry.LevelFatal
+
+	event.Exception = []sentry.Exception{
+		*panicToSentryException(e.Panic),
+	}
+
+	event.Threads = goroutinesToSentryThreads(e.Threads)
+
+	return event, nil
+}
+
+func panicToSentryException(p *Panic) *sentry.Exception {
+	mechanism := &sentry.Mechanism{
+		Type: "panic",
+		Data: make(map[string]interface{}),
+	}
+
+	if p.Signal != "" {
+		mechanism.Type = "signal"
+		mechanism.Data["signal"] = p.Signal
+		mechanism.Data["code"] = p.Code
+		mechanism.Description = p.SignalInfo
+		if p.Address != "" {
+			mechanism.Data["relevant_address"] = p.Address
+		}
+		if p.PC != "" {
+			mechanism.Data["program_counter"] = p.PC
+		}
+	}
+
+	exception := &sentry.Exception{
+		Type:      p.Type,
+		Value:     p.Description,
+		ThreadID:  p.ThreadId,
+		Mechanism: mechanism,
+	}
+
+	return exception
+}
+
+func goroutinesToSentryThreads(threads []*Goroutine) []sentry.Thread {
+	sentryThreads := make([]sentry.Thread, len(threads))
+
+	for i, thread := range threads {
+		numFrames := len(thread.Frames)
+
+		stacktrace := &sentry.Stacktrace{
+			Frames: make([]sentry.Frame, numFrames),
+		}
+
+		// TODO: I don't understand how this is supposed to work yet
+		// and there's no documentation for the field
+		//if thread.FramesElided {
+		//	stacktrace.FramesOmitted = []uint{1}
+		//}
+
+		for j, f := range thread.Frames {
+			var fun string
+			if f.Receiver != "" {
+				fun = f.Receiver + "." + f.Func
+			} else {
+				fun = f.Func
+			}
+
+			inApp := !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
+				strings.Contains(f.Package, "vendor") ||
+				strings.Contains(f.Package, "third_party"))
+
+			stacktrace.Frames[numFrames-j-1] = sentry.Frame{
+				Package:  f.Package,
+				Function: fun,
+				Filename: f.File,
+				Lineno:   f.Line,
+				InApp:    inApp,
+			}
+		}
+
+		sentryThreads[i] = sentry.Thread{
+			ID:         thread.ID,
+			Stacktrace: stacktrace,
+		}
+	}
+
+	return sentryThreads
 }
