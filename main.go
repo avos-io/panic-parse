@@ -56,7 +56,7 @@ func panicHandler(output string) {
 	fmt.Printf("panic report: %v\n", string(json))
 
 	id := sentry.CaptureEvent(event)
-	fmt.Printf("sentry event id: %v\n", id)
+	fmt.Printf("sentry event id: %v\n", *id)
 
 	os.Exit(1)
 }
