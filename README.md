@@ -1,6 +1,6 @@
 # Panic-Parse
 
-Panic-parse is a different kind of Sentry SDK for Go.
+Panic-parse turns Go panic logs into Sentry events ready for ingestion into the Sentry SDK.
 
 The official Sentry SDK is designed to [capture errors and messages](https://docs.sentry.io/platforms/go/usage/) and as a [panic recovery handler](https://docs.sentry.io/platforms/go/usage/panics/).
 However, Go lacks a global panic/exit handler and it doesn't seem like it'll come [any time soon](https://github.com/golang/go/issues/32333).
@@ -14,11 +14,5 @@ It's therefore better to just let Go crash and upload that to Sentry instead. It
 
 > For example, perhaps the separate analyzer process could examine the stack trace.
 
-This Sentry SDK therefore parses a text panic output convert the stacktrace into a format supported by Sentry.
+Panic-parse therefore parses a text panic output to convert the stacktrace into the Sentry event struct.
 It is designed to be used with a monitor process, such as that provided by [panicwrap](https://github.com/mitchellh/panicwrap/), to catch global panics in the program and report them to Sentry.
-
-## TODO
-
-- [ ] Support panic recovery reporting similar to how the official Go SDK does it
-- [ ] Support error reporting similar to how the official Go SDK does it
-- [ ] Support messages similar to how the official Go SDK does it
