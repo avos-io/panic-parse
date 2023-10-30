@@ -65,4 +65,19 @@ google.golang.org/grpc.(*Server).serveStreams.func1.1()
 		/home/jon/go/pkg/mod/google.golang.org/grpc@v1.57.0/server.go:982 +0x98
 created by google.golang.org/grpc.(*Server).serveStreams.func1
 		/home/jon/go/pkg/mod/google.golang.org/grpc@v1.57.0/server.go:980 +0x18c`,
+	`panic: Something went wrong in packageA.foo()
+
+goroutine 1 [running]:
+github.com/user/packageA.foo()
+		/path/to/packageA/foo.go:10
+github.com/user/packageB.bar()
+		/path/to/packageB/bar.go:15
+main.main()
+		/path/to/main.go:8
+
+goroutine 2 [running]:
+main.anotherFunction()
+		/path/to/main.go:20
+created by main.main
+		/path/to/main.go:25`,
 }

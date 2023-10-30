@@ -102,7 +102,7 @@ func (s *SentryClient) trySendCrashReport(e *Event) (string, error) {
 
 	var payload io.Reader
 	var size int
-	var headers http.Header
+	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
 	headers.Set("X-Sentry-Auth", "Sentry sentry_version=7, sentry_client=panic-parse/0.0.1, sentry_key="+s.PublicKey+sentrySecret)
 

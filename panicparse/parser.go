@@ -19,8 +19,8 @@ var (
 	panicRegexp     = regexp.MustCompile(`^panic: (.*)$`)
 	signalRegexp    = regexp.MustCompile(`^\[signal\s([^:]+):\s(.*)\]$`)
 	goroutineRegexp = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(?:, (\d+) minutes)?(, locked to thread)?\]:$`)
-	funcRegexp      = regexp.MustCompile(`^([^\(]+)(?:\.\((\*)?([^\)]+)\))?\.([^\(]+)(?:\((.*)\))$`)
-	lineRegexp      = regexp.MustCompile(`^\s*(.+):(\d+)\s+(.*)$`)
+	funcRegexp      = regexp.MustCompile(`^(created by )?([^\(]+)(?:\.\((\*)?([^\)]+)\))?\.([^\(]+)(?:\((.*)\))?$`)
+	fileRegexp      = regexp.MustCompile(`^\s*(.+):(\d+)\s*(.*)$`)
 
 	framesElided = []byte("...additional frames elided...")
 )
@@ -234,6 +234,7 @@ func Parse(trace io.Reader) *Event {
 	for scanner.Scan() {
 		line := scanner.Bytes()
 
+	restartSwitch:
 		switch state {
 		case stateInit:
 			matches := panicRegexp.FindSubmatch(line)
@@ -293,8 +294,7 @@ func Parse(trace io.Reader) *Event {
 			id, err := strconv.Atoi(string(matches[1]))
 			if err != nil {
 				log.Err(err).Str("id", string(matches[1])).Msg("failed to parse goroutine id")
-				state = statePanic
-				continue
+				id = 0
 			}
 
 			// I think the first thread we see is the one that panicked
@@ -315,16 +315,18 @@ func Parse(trace io.Reader) *Event {
 			if matches == nil {
 				if bytes.HasPrefix(line, framesElided) {
 					goroutine.FramesElided = true
+					continue
 				}
-				continue
+				state = stateSignal
+				goto restartSwitch
 			}
 
 			frame = &Frame{
 				RawFunc:   string(matches[0]),
-				Package:   string(matches[1]),
-				Pointer:   len(matches[2]) > 0,
-				Receiver:  string(matches[3]),
-				Func:      string(matches[4]),
+				Package:   string(matches[2]),
+				Pointer:   len(matches[3]) > 0,
+				Receiver:  string(matches[4]),
+				Func:      string(matches[5]),
 				Arguments: strings.Split(string(matches[5]), ", "),
 			}
 			goroutine.Frames = append(goroutine.Frames, frame)
@@ -334,27 +336,25 @@ func Parse(trace io.Reader) *Event {
 		case stateStackFile:
 			if frame == nil {
 				log.Error().Msg("frame is nil")
-				state = statePanic
+				state = stateSignal
 			}
 
-			matches := lineRegexp.FindSubmatch(line)
+			matches := fileRegexp.FindSubmatch(line)
 			if matches == nil {
-				state = statePanic
+				state = stateSignal
 				continue
 			}
 
 			line, err := strconv.Atoi(string(matches[2]))
 			if err != nil {
 				log.Err(err).Str("line", string(matches[2])).Msg("failed to parse line number")
-				state = statePanic
-				continue
+				line = 0
 			}
 
 			offset, err := strconv.ParseInt(string(matches[3]), 0, 64)
 			if err != nil {
 				log.Err(err).Str("offset", string(matches[3])).Msg("failed to parse stack offset")
-				state = statePanic
-				continue
+				offset = 0
 			}
 
 			frame.File = string(matches[1])

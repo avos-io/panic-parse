@@ -12,16 +12,22 @@ import (
 
 var sentry = panicparse.Init("your dsn here")
 
-func main() {
-	exitStatus, err := panicwrap.BasicWrap(panicHandler)
-	if err != nil {
-		panic(err)
-	}
+const (
+	wrap = true // Could be set with a command line flag or environment variable
+)
 
-	// If exitStatus >= 0, then we're the parent process and the panicwrap
-	// re-executed ourselves and completed. Just exit with the proper status.
-	if exitStatus >= 0 {
-		os.Exit(exitStatus)
+func main() {
+	if wrap {
+		exitStatus, err := panicwrap.BasicWrap(panicHandler)
+		if err != nil {
+			panic(err)
+		}
+
+		// If exitStatus >= 0, then we're the parent process and the panicwrap
+		// re-executed ourselves and completed. Just exit with the proper status.
+		if exitStatus >= 0 {
+			os.Exit(exitStatus)
+		}
 	}
 
 	// Else we're the child so execute our real main function
