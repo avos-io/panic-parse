@@ -17,7 +17,7 @@ var (
 	panicRegexp     = regexp.MustCompile(`^panic: (.*)$`)
 	signalRegexp    = regexp.MustCompile(`^\[signal\s([^:]+):\s(.*)\]$`)
 	goroutineRegexp = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(?:, (\d+) minutes)?(, locked to thread)?\]:$`)
-	funcRegexp      = regexp.MustCompile(`^(created by )?([^\(]+)(?:\.\((\*)?([^\)]+)\))?\.([^\(]+)(?:\((.*)\))?$`)
+	funcRegexp      = regexp.MustCompile(`^(created by )?(?:([^\/\(]*\/?[^\.\(]*)\.)?(?:\((\*)?([^\)]+)\))?\.?([^\(]+)(?:\(([^\)]*)\))?$`)
 	fileRegexp      = regexp.MustCompile(`^\s*(.+):(\d+)\s*(.*)$`)
 
 	framesElided = []byte("...additional frames elided...")
@@ -242,10 +242,13 @@ func panicToSentryException(p *Panic) *sentry.Exception {
 	}
 
 	if p.Signal != "" {
+		handled := false
+
 		mechanism.Type = "signal"
 		mechanism.Data["signal"] = p.Signal
 		mechanism.Data["code"] = p.Code
 		mechanism.Description = p.SignalInfo
+		mechanism.Handled = &handled
 		if p.Address != "" {
 			mechanism.Data["relevant_address"] = p.Address
 		}
@@ -289,6 +292,7 @@ func goroutinesToSentryThreads(threads []*Goroutine) []sentry.Thread {
 			}
 
 			inApp := !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
+				strings.Contains(f.File, "go/pkg/mod") ||
 				strings.Contains(f.Package, "vendor") ||
 				strings.Contains(f.Package, "third_party"))
 

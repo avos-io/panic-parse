@@ -16,12 +16,11 @@ const (
 	wrap = true // Could be set with a command line flag or environment variable
 )
 
-func main() {
-	sentry.Init(sentry.ClientOptions{
-		Dsn: "your dsn here",
-	})
-	defer sentry.Flush(time.Second * 5)
+var (
+	sentryTimeout = 5 * time.Second
+)
 
+func main() {
 	if wrap {
 		exitStatus, err := panicwrap.BasicWrap(panicHandler)
 		if err != nil {
@@ -40,6 +39,9 @@ func main() {
 }
 
 func oldMain() {
+	// You can use a Sentry like normal here if you'd like
+	initSentry(false)
+
 	// Let's say we panic
 	//panic("oh shucks")
 
@@ -48,7 +50,24 @@ func oldMain() {
 	*a = 1
 }
 
+func initSentry(sync bool) {
+	var transport sentry.Transport
+
+	if sync {
+		syncTransport := sentry.NewHTTPSyncTransport()
+		syncTransport.Timeout = sentryTimeout
+		transport = syncTransport
+	}
+
+	sentry.Init(sentry.ClientOptions{
+		Dsn:       "your dsn here",
+		Transport: transport,
+	})
+}
+
 func panicHandler(output string) {
+	initSentry(true)
+
 	event := panicparse.Parse(strings.NewReader(output))
 	event.Extra["panic"] = output
 
