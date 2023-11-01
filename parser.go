@@ -297,6 +297,7 @@ func goroutinesToSentryThreads(threads []*Goroutine) []sentry.Thread {
 				strings.Contains(f.Package, "vendor") ||
 				strings.Contains(f.Package, "third_party"))
 
+			// Sentry expects the frames in reverse order
 			stacktrace.Frames[numFrames-j-1] = sentry.Frame{
 				Package:  f.Package,
 				Function: fun,
