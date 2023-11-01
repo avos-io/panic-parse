@@ -160,12 +160,13 @@ func Parse(trace io.Reader) *sentry.Event {
 			state = stateStackFunc
 
 		case stateStackFunc:
+			if bytes.HasPrefix(line, framesElided) {
+				goroutine.FramesElided = true
+				continue
+			}
+
 			matches := funcRegexp.FindSubmatch(line)
 			if matches == nil {
-				if bytes.HasPrefix(line, framesElided) {
-					goroutine.FramesElided = true
-					continue
-				}
 				state = stateSignal
 				goto restartSwitch
 			}
