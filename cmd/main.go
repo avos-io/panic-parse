@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	wrap = true // Could be set with a command line flag or environment variable
+	wrap = true            // Could be set with a command line flag or environment variable
+	dsn  = "your dsn here" // Could be set with an environment variable or secret
 )
 
 var (
@@ -67,7 +68,7 @@ func initSentry(sync bool) {
 	}
 
 	sentry.Init(sentry.ClientOptions{
-		Dsn:       "your dsn here",
+		Dsn:       dsn,
 		Transport: transport,
 	})
 }
