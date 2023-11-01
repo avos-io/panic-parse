@@ -16,3 +16,5 @@ It's therefore better to just let Go crash and upload that to Sentry instead. It
 
 Panic-parse therefore parses a text panic output to convert the stacktrace into the Sentry event struct.
 It is designed to be used with a monitor process, such as that provided by [panicwrap](https://github.com/mitchellh/panicwrap/), to catch global panics in the program and report them to Sentry.
+
+`cmd/main.go` provides a sample usage.

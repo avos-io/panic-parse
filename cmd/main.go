@@ -40,6 +40,8 @@ func main() {
 
 func oldMain() {
 	// You can use a Sentry like normal here if you'd like
+	// Use Async transport to avoid blocking the panic recovery/err handler while
+	// the event is sent to Sentry
 	initSentry(false)
 
 	// Let's say we panic
@@ -50,6 +52,11 @@ func oldMain() {
 	*a = 1
 }
 
+// Initialise the Sentry SDK
+//
+// If sync is true, Sentry events are sent synchronously. This is useful for
+// ensuring that the event is sent before the process exits. However, it can
+// cause the process to hang if the Sentry server is down or unreachable.
 func initSentry(sync bool) {
 	var transport sentry.Transport
 
@@ -66,6 +73,7 @@ func initSentry(sync bool) {
 }
 
 func panicHandler(output string) {
+	// Use sync transport since we're dying anyway
 	initSentry(true)
 
 	event := panicparse.Parse(strings.NewReader(output))
