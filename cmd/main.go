@@ -15,9 +15,7 @@ import (
 const (
 	wrap = true            // Could be set with a command line flag or environment variable
 	dsn  = "your dsn here" // Could be set with an environment variable or secret
-)
 
-var (
 	sentryTimeout = 5 * time.Second
 )
 
@@ -43,7 +41,8 @@ func oldMain() {
 	// You can use a Sentry like normal here if you'd like
 	// Use Async transport to avoid blocking the panic recovery/err handler while
 	// the event is sent to Sentry
-	initSentry(false)
+	cleanup := initSentry(false)
+	defer cleanup()
 
 	// Let's say we panic
 	//panic("oh shucks")
@@ -58,19 +57,28 @@ func oldMain() {
 // If sync is true, Sentry events are sent synchronously. This is useful for
 // ensuring that the event is sent before the process exits. However, it can
 // cause the process to hang if the Sentry server is down or unreachable.
-func initSentry(sync bool) {
+//
+// The cleanpu function can be ignored if sync is false.
+func initSentry(sync bool) func() {
 	var transport sentry.Transport
+
+	cleanup := func() {
+		sentry.Flush(sentryTimeout)
+	}
 
 	if sync {
 		syncTransport := sentry.NewHTTPSyncTransport()
 		syncTransport.Timeout = sentryTimeout
 		transport = syncTransport
+		cleanup = func() {}
 	}
 
 	sentry.Init(sentry.ClientOptions{
 		Dsn:       dsn,
 		Transport: transport,
 	})
+
+	return cleanup
 }
 
 func panicHandler(output string) {
