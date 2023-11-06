@@ -75,9 +75,7 @@ func Parse(trace io.Reader) *sentry.Event {
 
 	state := stateInit
 
-	panic := Panic{
-		Type: "crash",
-	}
+	var panic *Panic
 
 	threads := []*Goroutine{}
 
@@ -93,6 +91,10 @@ func Parse(trace io.Reader) *sentry.Event {
 			matches := panicRegexp.FindSubmatch(line)
 			if matches == nil {
 				continue
+			}
+
+			panic = &Panic{
+				Type: "crash",
 			}
 
 			panic.Type = string(matches[1])
@@ -215,8 +217,12 @@ func Parse(trace io.Reader) *sentry.Event {
 		}
 	}
 
+	if panic == nil {
+		return nil
+	}
+
 	return eventToSentryEvent(&Event{
-		Panic:   &panic,
+		Panic:   panic,
 		Threads: threads,
 		Level:   "fatal",
 	})
@@ -292,7 +298,7 @@ func goroutinesToSentryThreads(threads []*Goroutine) []sentry.Thread {
 				fun = f.Func
 			}
 
-			inApp := !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
+			inApp := (f.File != "" || f.Package != "") && !(strings.HasPrefix(f.File, build.Default.GOROOT) ||
 				strings.Contains(f.File, "go/pkg/mod") ||
 				strings.Contains(f.Package, "vendor") ||
 				strings.Contains(f.Package, "third_party"))

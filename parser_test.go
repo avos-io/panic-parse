@@ -337,22 +337,115 @@ main.aFunction()
 			Level: "fatal",
 		},
 	},
+
+	// Invalid input cases
+	"empty": {
+		Data:   "",
+		Result: nil,
+	},
+	"no panic": {
+		Data: `goroutine 1 [running]:
+main.main()
+	/tmp/sandbox675251439/main.go:23 +0x314`,
+		Result: nil,
+	},
+	"no goroutines": {
+		Data: `panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0xffffffff addr=0x0 pc=0x20314]`,
+		Result: &sentry.Event{
+			Message: "invalid memory address or nil pointer dereference",
+			Exception: []sentry.Exception{{
+				Type:  "runtime error",
+				Value: "invalid memory address or nil pointer dereference",
+				Mechanism: &sentry.Mechanism{
+					Type:        "signal",
+					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
+					Description: "segmentation violation",
+					Handled:     new(bool),
+				},
+			}},
+			Threads: nil,
+			Level:   "fatal",
+		},
+	},
+	"no frames": {
+		Data: `panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0xffffffff addr=0x0 pc=0x20314]
+
+goroutine 1 [running]:`,
+		Result: &sentry.Event{
+			Message: "invalid memory address or nil pointer dereference",
+			Exception: []sentry.Exception{{
+				Type:     "runtime error",
+				Value:    "invalid memory address or nil pointer dereference",
+				ThreadID: "1",
+				Mechanism: &sentry.Mechanism{
+					Type:        "signal",
+					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
+					Description: "segmentation violation",
+					Handled:     new(bool),
+				},
+			}},
+			Threads: []sentry.Thread{{
+				ID: "1",
+				Stacktrace: &sentry.Stacktrace{
+					Frames: []sentry.Frame{},
+				},
+			}},
+			Level: "fatal",
+		},
+	},
+	"no file": {
+		Data: `panic: oh nooooooooo
+
+goroutine 1 [running]:
+panic(0x112c00, 0x1040a038)`,
+		Result: &sentry.Event{
+			Exception: []sentry.Exception{{
+				Type:     "oh nooooooooo",
+				ThreadID: "1",
+				Mechanism: &sentry.Mechanism{
+					Type: "panic",
+					Data: make(map[string]interface{}),
+				},
+			}},
+			Threads: []sentry.Thread{{
+				ID: "1",
+				Stacktrace: &sentry.Stacktrace{
+					Frames: []sentry.Frame{
+						{
+							Function: "panic",
+							Filename: "",
+							Lineno:   0,
+							InApp:    false,
+						},
+					},
+				},
+			},
+			},
+			Level: "fatal",
+		},
+	},
 }
 
 func compareEvents(t *testing.T, expected *sentry.Event, actual *sentry.Event) {
 	is := assert.New(t)
 
-	require.NotNil(t, expected)
-	require.NotNil(t, actual)
+	if expected == nil {
+		is.Nil(actual)
+		return
+	}
 
 	is.Equal(expected.Type, actual.Type, "Event Type")
 	is.Equal(expected.Message, actual.Message, "Event Message")
 	is.Equal(expected.Level, actual.Level, "Event Level")
 
+	require.Equal(t, len(expected.Exception), len(actual.Exception), "Event Exceptions")
 	for i := range actual.Exception {
 		compareExceptions(t, &expected.Exception[i], &actual.Exception[i])
 	}
 
+	require.Equal(t, len(expected.Threads), len(actual.Threads), "Event Threads")
 	for i := range actual.Threads {
 		compareThreads(t, &expected.Threads[i], &actual.Threads[i])
 	}
