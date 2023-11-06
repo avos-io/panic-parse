@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	panicRegexp     = regexp.MustCompile(`^panic: (.*)$`)
-	signalRegexp    = regexp.MustCompile(`^\[signal\s([^:]+):\s(.*)\]$`)
-	goroutineRegexp = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(?:, (\d+) minutes)?(, locked to thread)?\]:$`)
-	funcRegexp      = regexp.MustCompile(`^(created by )?(?:([^\/\(]*\/?[^\.\(]*)\.)?(?:\((\*)?([^\)]+)\))?\.?([^\(]+)(?:\(([^\)]*)\))?$`)
-	fileRegexp      = regexp.MustCompile(`^\s*(.+):(\d+)\s*(.*)$`)
+	panicRegexp      = regexp.MustCompile(`^panic: (.*)$`)
+	fatalErrorRegexp = regexp.MustCompile(`^fatal error: (.*)$`)
+	signalRegexp     = regexp.MustCompile(`^\[signal\s([^:]+):\s(.*)\]$`)
+	goroutineRegexp  = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(?:, (\d+) minutes)?(, locked to thread)?\]:$`)
+	funcRegexp       = regexp.MustCompile(`^(created by )?(?:([^\/\(]*\/?[^\.\(]*)\.)?(?:\((\*)?([^\)]+)\))?\.?([^\(]+)(?:\(([^\)]*)\))?$`)
+	fileRegexp       = regexp.MustCompile(`^\s*(.+):(\d+)\s*(.*)$`)
 
 	framesElided = []byte("...additional frames elided...")
 )
@@ -27,6 +28,7 @@ type state int
 
 const (
 	stateInit state = iota
+	stateFatalError
 	statePanic
 	stateSignal
 	stateStackFunc
@@ -90,14 +92,27 @@ func Parse(trace io.Reader) *sentry.Event {
 		case stateInit:
 			matches := panicRegexp.FindSubmatch(line)
 			if matches == nil {
+				// Try fatal error handling instead
+				state = stateFatalError
+				goto restartSwitch
+			}
+
+			panic = &Panic{
+				Type: string(matches[1]),
+			}
+
+			state = statePanic
+
+		case stateFatalError:
+			matches := fatalErrorRegexp.FindSubmatch(line)
+			if matches == nil {
 				continue
 			}
 
 			panic = &Panic{
-				Type: "crash",
+				Type: string(matches[1]),
 			}
 
-			panic.Type = string(matches[1])
 			state = statePanic
 
 		case statePanic:

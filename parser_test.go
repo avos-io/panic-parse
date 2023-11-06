@@ -337,6 +337,79 @@ main.aFunction()
 			Level: "fatal",
 		},
 	},
+	"fatal error": {
+		Data: `fatal error: unexpected signal during runtime execution
+[signal SIGSEGV: segmentation violation code=0xffffffff addr=0x0 pc=0x20314]
+
+goroutine 1 [running]:
+runtime.throw({0x112c00, 0x1040a038})
+	/usr/local/go/src/runtime/panic.go:1116 +0x72 fp=0x7fffbf9f7f18 sp=0x7fffbf9f7f00 pc=0x40c2e2
+
+goroutine 2 [runnable]:
+runtime.systemstack_switch()
+	/usr/local/go/src/runtime/asm_amd64.s:351 fp=0xc0000b7f58 sp=0xc0000b7f50 pc=0x45a1a0
+runtime.mstart1()
+	/usr/local/go/src/runtime/proc.go:1231 fp=0xc0000b7f60 sp=0xc0000b7f58 pc=0x42c3e1
+runtime.mstart()
+	/usr/local/go/src/runtime/proc.go:1187 fp=0xc0000b7f68 sp=0xc0000b7f60 pc=0x42c1c0`,
+		Result: &sentry.Event{
+			Exception: []sentry.Exception{{
+				Type:     "unexpected signal during runtime execution",
+				ThreadID: "1",
+				Mechanism: &sentry.Mechanism{
+					Type:        "signal",
+					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
+					Description: "segmentation violation",
+					Handled:     new(bool),
+				},
+			}},
+			Threads: []sentry.Thread{
+				{
+					ID: "1",
+					Stacktrace: &sentry.Stacktrace{
+						Frames: []sentry.Frame{
+							{
+								Package:  "runtime",
+								Function: "throw",
+								Filename: "/usr/local/go/src/runtime/panic.go",
+								Lineno:   1116,
+								InApp:    false,
+							},
+						},
+					},
+				},
+				{
+					ID: "2",
+					Stacktrace: &sentry.Stacktrace{
+						Frames: []sentry.Frame{
+							{
+								Package:  "runtime",
+								Function: "mstart",
+								Filename: "/usr/local/go/src/runtime/proc.go",
+								Lineno:   1187,
+								InApp:    false,
+							},
+							{
+								Package:  "runtime",
+								Function: "mstart1",
+								Filename: "/usr/local/go/src/runtime/proc.go",
+								Lineno:   1231,
+								InApp:    false,
+							},
+							{
+								Package:  "runtime",
+								Function: "systemstack_switch",
+								Filename: "/usr/local/go/src/runtime/asm_amd64.s",
+								Lineno:   351,
+								InApp:    false,
+							},
+						},
+					},
+				},
+			},
+			Level: "fatal",
+		},
+	},
 
 	// Invalid input cases
 	"empty": {
