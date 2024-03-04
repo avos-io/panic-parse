@@ -282,7 +282,7 @@ func panicToSentryException(p *Panic) *sentry.Exception {
 	threadId, err := strconv.ParseUint(p.ThreadId, 10, 64)
 	if err != nil {
 		log.Err(err).Str("thread_id", p.ThreadId).Msg("failed to parse thread id")
-		// But we can just use the default value of 0 anyway
+		threadId = 0
 	}
 
 	exception := &sentry.Exception{
