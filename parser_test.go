@@ -41,7 +41,7 @@ main.main()
 			Exception: []sentry.Exception{{
 				Type:     "runtime error",
 				Value:    "invalid memory address or nil pointer dereference",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type:        "signal",
 					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
@@ -105,7 +105,7 @@ created by google.golang.org/grpc.(*Server).serveStreams.func1
 		Result: &sentry.Event{
 			Exception: []sentry.Exception{{
 				Type:     "oh my god",
-				ThreadID: "86",
+				ThreadID: 86,
 				Mechanism: &sentry.Mechanism{
 					Type: "panic",
 					Data: make(map[string]interface{}),
@@ -231,7 +231,7 @@ created by main.main
 		Result: &sentry.Event{
 			Exception: []sentry.Exception{{
 				Type:     "Something went wrong in packageA.foo()",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type: "panic",
 					Data: make(map[string]interface{}),
@@ -306,7 +306,7 @@ main.aFunction()
 			Exception: []sentry.Exception{{
 				Type:     "runtime error",
 				Value:    "invalid memory address or nil pointer dereference",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type:        "signal",
 					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
@@ -355,7 +355,7 @@ runtime.mstart()
 		Result: &sentry.Event{
 			Exception: []sentry.Exception{{
 				Type:     "unexpected signal during runtime execution",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type:        "signal",
 					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
@@ -451,7 +451,7 @@ goroutine 1 [running]:`,
 			Exception: []sentry.Exception{{
 				Type:     "runtime error",
 				Value:    "invalid memory address or nil pointer dereference",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type:        "signal",
 					Data:        map[string]interface{}{"signal": "SIGSEGV", "code": "0xffffffff", "relevant_address": "0x0", "program_counter": "0x20314"},
@@ -476,7 +476,7 @@ panic(0x112c00, 0x1040a038)`,
 		Result: &sentry.Event{
 			Exception: []sentry.Exception{{
 				Type:     "oh nooooooooo",
-				ThreadID: "1",
+				ThreadID: 1,
 				Mechanism: &sentry.Mechanism{
 					Type: "panic",
 					Data: make(map[string]interface{}),
