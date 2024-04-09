@@ -425,7 +425,6 @@ main.runGrpcServer({0x2ab9298?, 0x41fb5c0}, {0x0?}, 0xc0003dc680, 0xc0005b8690, 
 created by main.mainInner in goroutine 1
 	/app/cmd/server/main.go:520 +0x44c`,
 		Result: &sentry.Event{
-			Message: "", //"Failed to create zitadel client",
 			Exception: []sentry.Exception{
 				{
 					Type:     "Failed to create zitadel client",
