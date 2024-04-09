@@ -14,8 +14,6 @@ func TestPanicParse(t *testing.T) {
 	for name, tc := range testCases {
 		c := tc
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			event := panicparse.Parse(strings.NewReader(c.Data))
 
 			compareEvents(t, c.Result, event)
@@ -408,6 +406,89 @@ runtime.mstart()
 				},
 			},
 			Level: "fatal",
+		},
+	},
+	"another panic": {
+		Data: `panic: Failed to create zitadel client
+
+goroutine 58 [running]:
+github.com/rs/zerolog/log.Panic.(*Logger).Panic.func1({0x2705549?, 0x0?})
+	/go/pkg/mod/github.com/rs/zerolog@v1.32.0/log.go:405 +0x27
+github.com/rs/zerolog.(*Event).msg(0xc0005b91f0, {0x2705549, 0x1f})
+	/go/pkg/mod/github.com/rs/zerolog@v1.32.0/event.go:158 +0x2c2
+github.com/rs/zerolog.(*Event).Msg(...)
+	/go/pkg/mod/github.com/rs/zerolog@v1.32.0/event.go:110
+main.makeZitadelClient()
+	/app/cmd/server/main.go:158 +0x10e
+main.runGrpcServer({0x2ab9298?, 0x41fb5c0}, {0x0?}, 0xc0003dc680, 0xc0005b8690, 0xc000e4b200, 0x0?)
+	/app/cmd/server/main.go:260 +0x591
+created by main.mainInner in goroutine 1
+	/app/cmd/server/main.go:520 +0x44c`,
+		Result: &sentry.Event{
+			Message: "", //"Failed to create zitadel client",
+			Exception: []sentry.Exception{
+				{
+					Type:     "Failed to create zitadel client",
+					ThreadID: 58,
+					Mechanism: &sentry.Mechanism{
+						Type: "panic",
+						Data: map[string]interface{}{},
+					},
+				},
+			},
+			Level: sentry.LevelFatal,
+			Threads: []sentry.Thread{
+				{
+					Name: "foo",
+					ID:   "58",
+					Stacktrace: &sentry.Stacktrace{
+						Frames: []sentry.Frame{
+							{
+								Package:  "main",
+								Function: "mainInner in goroutine 1",
+								Filename: "/app/cmd/server/main.go",
+								Lineno:   520,
+								InApp:    true,
+							},
+							{
+								Package:  "main",
+								Function: "runGrpcServer",
+								Filename: "/app/cmd/server/main.go",
+								Lineno:   260,
+								InApp:    true,
+							},
+							{
+								Package:  "main",
+								Function: "makeZitadelClient",
+								Filename: "/app/cmd/server/main.go",
+								Lineno:   158,
+								InApp:    true,
+							},
+							{
+								Package:  "github.com/rs/zerolog",
+								Function: "Event.Msg",
+								Filename: "/go/pkg/mod/github.com/rs/zerolog@v1.32.0/event.go",
+								Lineno:   110,
+								InApp:    false,
+							},
+							{
+								Package:  "github.com/rs/zerolog",
+								Function: "Event.msg",
+								Filename: "/go/pkg/mod/github.com/rs/zerolog@v1.32.0/event.go",
+								Lineno:   158,
+								InApp:    false,
+							},
+							{
+								Package:  "github.com/rs/zerolog/log",
+								Function: "Logger.Panic.func1",
+								Filename: "/go/pkg/mod/github.com/rs/zerolog@v1.32.0/log.go",
+								Lineno:   405,
+								InApp:    false,
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 

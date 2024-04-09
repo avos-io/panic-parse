@@ -18,7 +18,7 @@ var (
 	fatalErrorRegexp = regexp.MustCompile(`^fatal error: (.*)$`)
 	signalRegexp     = regexp.MustCompile(`^\[signal\s([^:]+):\s(.*)\]$`)
 	goroutineRegexp  = regexp.MustCompile(`^goroutine (\d+) \[([^,]+)(?:, (\d+) minutes)?(, locked to thread)?\]:$`)
-	funcRegexp       = regexp.MustCompile(`^(created by )?(?:([^\/\(]*\/?[^\.\(]*)\.)?(?:\((\*)?([^\)]+)\))?\.?([^\(]+)(?:\(([^\)]*)\))?$`)
+	funcRegexp       = regexp.MustCompile(`^(?P<created_by>created by )?(?:(?P<package>[^\/\(]*\/?[^\.\(]*)\.)?(?P<xtra>[^\/\(]+\.)*?(?:\((?P<pointer>\*)?(?P<object>[^\)]+)\))?\.?(?P<method>[^\(]+)(?:\((?P<args>[^\)]*)\))?$`)
 	fileRegexp       = regexp.MustCompile(`^\s*(.+):(\d+)\s*(.*)$`)
 
 	framesElided = []byte("...additional frames elided...")
@@ -190,11 +190,11 @@ func Parse(trace io.Reader) *sentry.Event {
 
 			frame = &Frame{
 				RawFunc:   string(matches[0]),
-				Package:   string(matches[2]),
-				Pointer:   len(matches[3]) > 0,
-				Receiver:  string(matches[4]),
-				Func:      string(matches[5]),
-				Arguments: strings.Split(string(matches[5]), ", "),
+				Package:   string(matches[funcRegexp.SubexpIndex("package")]),
+				Pointer:   len(matches[funcRegexp.SubexpIndex("pointer")]) > 0,
+				Receiver:  string(matches[funcRegexp.SubexpIndex("object")]),
+				Func:      string(matches[funcRegexp.SubexpIndex("method")]),
+				Arguments: strings.Split(string(matches[funcRegexp.SubexpIndex("args")]), ", "),
 			}
 			goroutine.Frames = append(goroutine.Frames, frame)
 
